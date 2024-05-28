@@ -65,7 +65,12 @@ public class ReplayService {
                 if(hexData.toString().endsWith(endIndex)){
                     break;
                 }
-             }
+            }
+
+            if(hexData.isEmpty()){
+                throw new Exception("파싱 데이터가 없습니다");
+            }
+
             String StringData = hexData.toString().replace("\\"+"\"", "\"");
             StringData = StringData.replace("\"[", "[").replace("]\"", "]");
 
