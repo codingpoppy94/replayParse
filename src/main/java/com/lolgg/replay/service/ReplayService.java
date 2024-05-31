@@ -2,12 +2,13 @@ package com.lolgg.replay.service;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -55,27 +56,37 @@ public class ReplayService {
     public JsonNode parseReplayData(InputStream inputStream) throws Exception{
         String startIndex = "{\"gameLength\":";
         String endIndex = "\\\"}]\"}";
+        int bytesToRead = 65536; 
 
         try {
             // 파일 열기
-            InputStreamReader isr = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
-            
-            // 데이터 읽기
-            StringBuilder hexData = new StringBuilder();
-            int data;
-             
-            while ((data = isr.read()) != -1) {
-                hexData.append((char) data);
+            long fileSize = inputStream.available();
+            System.out.println(fileSize);
 
-                if(hexData.toString().endsWith(startIndex)){
+            long startPosition = Math.max(fileSize - bytesToRead, 0);
+            int actualBytesToRead = (int) Math.min(bytesToRead, fileSize);
+
+            byte[] bytes = new byte[actualBytesToRead];
+
+            inputStream.skip(startPosition);
+            inputStream.read(bytes);
+
+            String data = new String(bytes, "UTF-8");
+
+            StringBuilder hexData = new StringBuilder();
+
+            for (int i = 0; i < data.length(); i++) {
+                hexData.append(data.charAt(i));
+
+                if (hexData.toString().endsWith(startIndex)) {
                     hexData.setLength(0);
                     hexData.append(startIndex);
                 }
-                if(hexData.toString().endsWith(endIndex)){
+                if (hexData.toString().endsWith(endIndex)) {
                     break;
                 }
             }
-
+            
             if(hexData.isEmpty()){
                 throw new Exception("파싱 데이터가 없습니다");
             }
