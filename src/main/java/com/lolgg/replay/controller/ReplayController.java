@@ -25,7 +25,7 @@ import com.lolgg.replay.service.ReplayService;
 @RequestMapping("/replay")
 public class ReplayController {
 
-     private static final Logger logger = LoggerFactory.getLogger(ReplayController.class);
+    private static final Logger logger = LoggerFactory.getLogger(ReplayController.class);
         
     public final ReplayService replayService;
     
@@ -43,7 +43,8 @@ public class ReplayController {
     public String multiParse(@RequestBody List<MultipartFile> files) throws IOException, Exception {
         for(MultipartFile file : files) {
             Map<String,Object> datas = new HashMap<String,Object>();
-            JsonNode jsonNode = replayService.parseReplayData(file.getInputStream());
+            byte[] bytes = replayService.changeByteArray(file.getInputStream());
+            JsonNode jsonNode = replayService.parseReplayData(bytes);
             datas.put("fileNameWithExt", file.getOriginalFilename());
             datas.put("createUser", "api");
             datas.put("body", jsonNode);

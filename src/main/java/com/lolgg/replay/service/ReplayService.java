@@ -6,11 +6,11 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
 import java.util.Map;
 
+import org.apache.tomcat.util.http.fileupload.ByteArrayOutputStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -27,6 +27,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Service
 public class ReplayService {
 
+    private static final Logger logger = LoggerFactory.getLogger(ReplayService.class);
+
     @Value("${api.league-url}")
     private String leagueUrl;
 
@@ -39,37 +41,41 @@ public class ReplayService {
         .body(body)
         .retrieve()
         .body(String.class);
-        System.out.println(result);
+        logger.info(result);
     }
 
     // 기본
     public JsonNode parseReplay(String fileUrl) throws Exception{
-        InputStream inputStream = getInputStreamDiscordFile(fileUrl);
+        byte[] bytes = getInputStreamDiscordFile(fileUrl);
         try {
-            return parseReplayData(inputStream);
+            return parseReplayData(bytes);
         } finally {
-            inputStream.close();
+            // bytes.close();
         }
     }
 
     // 리플레이 파일 데이터 파싱
-    public JsonNode parseReplayData(InputStream inputStream) throws Exception{
+    public JsonNode parseReplayData(byte[] byteArrays) throws Exception{
         String startIndex = "{\"gameLength\":";
         String endIndex = "\\\"}]\"}";
         int bytesToRead = 65536; 
 
+        if(byteArrays == null || byteArrays.length == 0){
+            throw new Exception("파싱 데이터가 없습니다");
+        }
+
         try {
-            // 파일 열기
-            long fileSize = inputStream.available();
-            System.out.println(fileSize);
+            int fileSize = byteArrays.length;
 
             long startPosition = Math.max(fileSize - bytesToRead, 0);
             int actualBytesToRead = (int) Math.min(bytesToRead, fileSize);
 
             byte[] bytes = new byte[actualBytesToRead];
 
-            inputStream.skip(startPosition);
-            inputStream.read(bytes);
+            System.arraycopy(byteArrays, (int) startPosition, bytes, 0, actualBytesToRead);
+
+            // inputStream.skip(startPosition);
+            // inputStream.read(bytes);
 
             String data = new String(bytes, "UTF-8");
 
@@ -87,10 +93,6 @@ public class ReplayService {
                 }
             }
             
-            if(hexData.isEmpty()){
-                throw new Exception("파싱 데이터가 없습니다");
-            }
-
             String StringData = hexData.toString().replace("\\"+"\"", "\"");
             StringData = StringData.replace("\"[", "[").replace("]\"", "]");
 
@@ -98,9 +100,6 @@ public class ReplayService {
             JsonNode rootNode = objectMapper.readTree(StringData);
             JsonNode statsArray = rootNode.get("statsJson");
 
-            // System.out.println("파싱완료");
-            // 파일 닫기
-            inputStream.close();
             return statsArray;
         } catch (IOException e) {
             e.printStackTrace();
@@ -109,7 +108,7 @@ public class ReplayService {
     }
 
     // 디스코드에 올린 파일 데이터 가져오기
-    private InputStream getInputStreamDiscordFile(String fileUrl) throws IOException, InterruptedException {
+    private byte[] getInputStreamDiscordFile(String fileUrl) throws IOException, InterruptedException {
         // HttpClient 생성
         HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -119,7 +118,27 @@ public class ReplayService {
             .build();
 
         HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        return changeByteArray(response.body());
+    }
 
-        return response.body();
+    // byte[] 변환
+    public byte[] changeByteArray(InputStream inputStream) {
+        int nRead;
+        byte[] data = new byte[1024]; 
+        try (ByteArrayOutputStream buffer = new ByteArrayOutputStream()) {
+            while ((nRead = inputStream.read(data, 0, data.length)) != -1) {
+                // 읽은 데이터의 각 바이트를 로그로 출력
+                // for (int i = 0; i < nRead; i++) {
+                    // System.out.printf("%02X ", data[i]);
+                // }
+                buffer.write(data, 0, nRead);
+            }
+                // 버퍼 플러시
+            buffer.flush();
+            return buffer.toByteArray();
+        } catch (Exception e) {
+            logger.info(e.getMessage());
+            return null;
+        }
     }
 }
