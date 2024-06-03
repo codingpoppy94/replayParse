@@ -141,4 +141,44 @@ public class ReplayService {
             return null;
         }
     }
+
+    // 14.10패치(2024-05-15) 이전 리플레이 데이터 파싱
+    public JsonNode parseReplayDataBefore(byte[] byteArrays) throws Exception{
+        String startIndex = "{\"gameLength\":";
+        String endIndex = "\\\"}]\"}";
+
+        if(byteArrays == null || byteArrays.length == 0){
+            throw new Exception("파싱 데이터가 없습니다");
+        }
+
+        try {
+            String data = new String(byteArrays, "UTF-8");
+
+            StringBuilder hexData = new StringBuilder();
+
+            for (int i = 0; i < data.length(); i++) {
+                hexData.append(data.charAt(i));
+
+                if (hexData.toString().endsWith(startIndex)) {
+                    hexData.setLength(0);
+                    hexData.append(startIndex);
+                }
+                if (hexData.toString().endsWith(endIndex)) {
+                    break;
+                }
+            }
+            
+            String StringData = hexData.toString().replace("\\"+"\"", "\"");
+            StringData = StringData.replace("\"[", "[").replace("]\"", "]");
+
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(StringData);
+            JsonNode statsArray = rootNode.get("statsJson");
+
+            return statsArray;
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new Exception("파싱에러");
+        }
+    }
 }

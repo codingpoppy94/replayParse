@@ -39,12 +39,28 @@ public class ReplayController {
         return replayService.parseReplay(fileUrl.get("fileUrl").asText());
     }
 
+    // 14.11 패치 이후
     @PostMapping("/parseFromApi")
     public String multiParse(@RequestBody List<MultipartFile> files) throws IOException, Exception {
         for(MultipartFile file : files) {
             Map<String,Object> datas = new HashMap<String,Object>();
             byte[] bytes = replayService.changeByteArray(file.getInputStream());
             JsonNode jsonNode = replayService.parseReplayData(bytes);
+            datas.put("fileNameWithExt", file.getOriginalFilename());
+            datas.put("createUser", "api");
+            datas.put("body", jsonNode);
+            replayService.sendData(datas);
+        }
+        return "성공";
+    }
+
+    // 14.10 패치 이전
+    @PostMapping("/parseFromApiBefore")
+    public String parseFromApiBefore(@RequestBody List<MultipartFile> files) throws IOException, Exception {
+        for(MultipartFile file : files) {
+            Map<String,Object> datas = new HashMap<String,Object>();
+            byte[] bytes = replayService.changeByteArray(file.getInputStream());
+            JsonNode jsonNode = replayService.parseReplayDataBefore(bytes);
             datas.put("fileNameWithExt", file.getOriginalFilename());
             datas.put("createUser", "api");
             datas.put("body", jsonNode);
